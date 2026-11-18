@@ -1,0 +1,152 @@
+services:
+  enshrouded:
+    build: .
+    image: ludix0/enshrouded:latest
+    container_name: enshrouded
+    restart: unless-stopped
+    # Wine met du temps à écrire la sauvegarde finale : on laisse le serveur
+    # s'arrêter proprement avant le SIGKILL.
+    stop_grace_period: 90s
+    volumes:
+      - ${HOME}/volumes/enshrouded/filesServer:/home/steam/enshrouded_server
+      - ${HOME}/volumes/enshrouded/saves:/home/steam/enshrouded_saves
+      - ${HOME}/volumes/enshrouded/wineprefix:/home/steam/.wine
+      - ${HOME}/volumes/steamcmd:/home/steam/steamcmd
+    environment:
+      # ── Système ────────────────────────────────────────────────────────────
+      - TZ=${TZ}
+      - PUID=${PUID}
+      - PGID=${PGID}
+      # Valeur fixe propre à ce projet (pas dans le fichier partagé) : chaque
+      # serveur doit pouvoir figer sa version indépendamment des autres.
+      - UPDATE_ON_START=true
+
+      # ── Compte Steam : anonyme (App 2278520 libre en téléchargement) ───────
+      # Ne relier à ${STEAM_USER}/${STEAM_PASSWORD} que si Steam refuse l'anonyme.
+      - STEAM_USER=
+      - STEAM_PASSWORD=
+
+      # ── Serveur ───────────────────────────────────────────────────────────
+      - SERVER_NAME=Ludix_Enshrouded_FR
+      # Champ "password" historique du JSON : conservé mais PLUS utilisé par le
+      # jeu depuis les userGroups — l'accès passe par les mots de passe de groupe.
+      - SERVER_PASSWORD=${password}
+      - SERVER_IP=0.0.0.0
+      # Depuis le Content Update #2, Enshrouded n'utilise QU'UN port (queryPort).
+      # Port INTERNE au conteneur, volontairement fixe (port officiel par
+      # défaut du jeu) : seul le port externe (voir "ports:" plus bas) est
+      # piloté par ${jeux1}. Le joueur se connecte toujours avec le port
+      # externe qu'on lui donne — la translation NAT est transparente, comme
+      # pour tous les autres serveurs de ce homelab.
+      - QUERY_PORT=15637
+      # Maximum absolu imposé par le jeu : 16
+      - SLOT_COUNT=${maxPlayers}
+      - ENABLE_VOICE_CHAT=false
+      # Proximity | Global
+      - VOICE_CHAT_MODE=Proximity
+      - ENABLE_TEXT_CHAT=true
+
+      # ── Groupes de joueurs (les 3 groupes imposés par le jeu) ──────────────
+      # C'est le mot de passe saisi à la connexion qui détermine le groupe.
+      - ADMIN_PASSWORD=${adminPassword}
+      - ADMIN_CAN_KICK_BAN=true
+      - ADMIN_CAN_ACCESS_INVENTORIES=true
+      - ADMIN_CAN_EDIT_BASE=true
+      - ADMIN_CAN_EXTEND_BASE=true
+      - ADMIN_RESERVED_SLOTS=1
+      - FRIEND_PASSWORD=${password}
+      - FRIEND_CAN_KICK_BAN=false
+      - FRIEND_CAN_ACCESS_INVENTORIES=true
+      - FRIEND_CAN_EDIT_BASE=true
+      - FRIEND_CAN_EXTEND_BASE=true
+      - FRIEND_RESERVED_SLOTS=0
+      - GUEST_PASSWORD=${password}_guest
+      - GUEST_CAN_KICK_BAN=false
+      - GUEST_CAN_ACCESS_INVENTORIES=false
+      - GUEST_CAN_EDIT_BASE=false
+      - GUEST_CAN_EXTEND_BASE=false
+      - GUEST_RESERVED_SLOTS=0
+
+      # ── Difficulté ────────────────────────────────────────────────────────
+      # Default | Relaxed | Hard | Survival | Custom
+      # ATTENTION : tout le bloc « Réglages fins » ci-dessous n'est lu par le jeu
+      # QUE si cette valeur vaut exactement "Custom". Avec un autre preset, le
+      # jeu charge ses propres valeurs et ignore silencieusement les suivantes.
+      - GAME_SETTINGS_PRESET=Custom
+
+      # ── Réglages fins — Joueur ────────────────────────────────────────────
+      # Facteurs multiplicateurs, plage utile 0.25 à 4 (1 = valeur normale)
+      - PLAYER_HEALTH_FACTOR=1
+      - PLAYER_MANA_FACTOR=1
+      - PLAYER_STAMINA_FACTOR=1
+      # Chaleur corporelle (résistance au froid) : 0.5 | 1 | 1.5 | 2
+      - PLAYER_BODY_HEAT_FACTOR=1
+      # Temps d'apnée sous l'eau
+      - PLAYER_DIVING_TIME_FACTOR=1
+      # Usure des équipements
+      - ENABLE_DURABILITY=true
+      # Malus de famine quand la faim tombe à zéro
+      - ENABLE_STARVING_DEBUFF=false
+      # Durée des bonus alimentaires
+      - FOOD_BUFF_DURATION_FACTOR=1
+      # Délai faim -> famine, en MINUTES (plage du jeu : 5 à 20)
+      - FROM_HUNGER_TO_STARVING_MINUTES=10
+      # Temps de survie dans le Voile
+      - SHROUD_TIME_FACTOR=1
+      # À la mort : AddBackpackMaterials | Everything | NoTombstone
+      - TOMBSTONE_MODE=AddBackpackMaterials
+      # Turbulences en deltaplane
+      - ENABLE_GLIDER_TURBULENCES=true
+
+      # ── Réglages fins — Monde et récolte ──────────────────────────────────
+      # Disabled | Rare | Normal | Often
+      - WEATHER_FREQUENCY=Normal
+      # VeryEasy | Easy | Normal | Hard | VeryHard
+      - FISHING_DIFFICULTY=Normal
+      # Vitesse de minage
+      - MINING_DAMAGE_FACTOR=1
+      # Vitesse de pousse des cultures
+      - PLANT_GROWTH_SPEED_FACTOR=1
+      # Quantité de ressources par récolte
+      - RESOURCE_DROP_STACK_AMOUNT_FACTOR=1
+      # Vitesse de production des ateliers/fermes
+      - FACTORY_PRODUCTION_SPEED_FACTOR=1
+      # Durée du jour et de la nuit, en MINUTES (plage du jeu : 2 à 60)
+      - DAY_TIME_DURATION_MINUTES=30
+      - NIGHT_TIME_DURATION_MINUTES=12
+
+      # ── Réglages fins — Progression ───────────────────────────────────────
+      # Ressources rendues en désapprenant un talent (0 = rien, 1 = tout)
+      - PERK_UPGRADE_RECYCLING_FACTOR=0.5
+      # Coût des talents
+      - PERK_COST_FACTOR=1
+      # Gains d'XP par source
+      - EXPERIENCE_COMBAT_FACTOR=1
+      - EXPERIENCE_MINING_FACTOR=1
+      - EXPERIENCE_EXPLORATION_QUESTS_FACTOR=1
+
+      # ── Réglages fins — Ennemis ───────────────────────────────────────────
+      # Few | Normal | Many | Extreme
+      - RANDOM_SPAWNER_AMOUNT=Normal
+      # Nombre d'ennemis pouvant attaquer en même temps : Few | Normal | Many | Extreme
+      - AGGRO_POOL_AMOUNT=Normal
+      - ENEMY_DAMAGE_FACTOR=1
+      - ENEMY_HEALTH_FACTOR=1
+      - ENEMY_STAMINA_FACTOR=1
+      # Distance de détection du joueur
+      - ENEMY_PERCEPTION_RANGE_FACTOR=1
+      - BOSS_DAMAGE_FACTOR=1
+      - BOSS_HEALTH_FACTOR=1
+      # Niveau de menace global
+      - THREAT_BONUS=1
+      # true = ennemis passifs (mode pacifique)
+      - PACIFY_ALL_ENEMIES=false
+      # Apprivoisement raté : KeepProgress | LoseSomeProgress | LoseAllProgress
+      - TAMING_STARTLE_REPERCUSSION=LoseSomeProgress
+      # Sévérité de la malédiction : Easy | Normal | Hard
+      - CURSE_MODIFIER=Normal
+
+    ports:
+      # Port hôte = ${jeux1} (variable, fichier partagé) -> port conteneur
+      # = 15637 (fixe, celui écrit dans QUERY_PORT ci-dessus).
+      - "${jeux1}:15637/udp"
